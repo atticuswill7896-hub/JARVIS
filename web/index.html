@@ -137,10 +137,9 @@
     <button type="submit" id="send-btn">Enter</button>
   </form>
 
-  <script>
-    // Replace these two values with your Cloudflare/Tailscale URL and your secret password
-    const SERVER_URL = "https://your-tunnel-url.trycloudflare.com/ask";
-    const API_SECRET = "your_chosen_password_here";
+<script>
+    // Your active Cloudflare tunnel URL ending with /ask
+    const SERVER_URL = "https://studying-aged-sheets-treat.trycloudflare.com/ask";
 
     const chat = document.getElementById("chat");
     const form = document.getElementById("controls");
@@ -169,7 +168,7 @@
         const res = await fetch(SERVER_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ command: cmd, secret: API_SECRET })
+          body: JSON.stringify({ command: cmd }) // No secret needed
         });
         const data = await res.json();
         loadingBubble.textContent = data.reply || data.error || "No response.";
@@ -221,7 +220,7 @@
         input.placeholder = "Message J.A.R.V.I.S...";
       };
     } else {
-      micBtn.style.display = "none"; // Hide mic if browser doesn't support Speech API
+      micBtn.style.display = "none"; 
     }
   </script>
 </body>
