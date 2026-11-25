@@ -18,6 +18,8 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
 from vosk import Model, KaldiRecognizer
+from flask import Flask, request, jsonify, send_file, after_this_request
+from flask_cors import CORS
 
 load_dotenv("secrets.env")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -65,6 +67,46 @@ except Exception as e:
 speaking_lock = threading.Lock()
 is_speaking = False
 is_asleep = False
+
+# Flask App for Web/Phone Chat Integration
+app = Flask(__name__)
+CORS(app)
+
+@app.route('/ask', methods=['POST'])
+def web_ask():
+    data = request.json or {}
+    cmd = data.get("command", "").strip()
+    print(f"[WEB COMMAND]: {cmd}")
+    
+    reply = process_command_logic(cmd, source="web")
+    return jsonify({"reply": reply})
+
+@app.route('/speak', methods=['POST'])
+def web_speak():
+    data = request.json or {}
+    text = data.get("text", "").strip()
+    if not text:
+        return jsonify({"error": "No text provided"}), 400
+
+    try:
+        temp_filename = asyncio.run(_generate_tts_mp3(text))
+
+        @after_this_request
+        def remove_file(response):
+            try:
+                if os.path.exists(temp_filename):
+                    os.remove(temp_filename)
+            except Exception as e:
+                print(f"[CLEANUP ERROR]: {e}")
+            return response
+
+        return send_file(temp_filename, mimetype="audio/mpeg")
+    except Exception as e:
+        print(f"[WEB TTS ERROR]: {e}")
+        return jsonify({"error": str(e)}), 500
+
+def run_flask_server():
+    app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
 
 def load_data():
     default_data = {
@@ -273,7 +315,6 @@ def handle_ai_tags_silent(reply_text):
             print(f"[OCR CLICK ERROR]: {e}")
         action_performed = True
 
-    # Hardware Control Handlers
     match_pin_on = re.search(r"\[PIN_ON\(([^)]+)\)\]", cleaned_text)
     if match_pin_on and arduino and arduino.is_open:
         pin = match_pin_on.group(1).strip()
@@ -628,7 +669,10 @@ def main():
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
     scheduler_thread.start()
 
-    print("[INIT]: J.A.R.V.I.S. Voice & Automation Core online. Press Ctrl+C to shut down.")
+    flask_thread = threading.Thread(target=run_flask_server, daemon=True)
+    flask_thread.start()
+
+    print("[INIT]: J.A.R.V.I.S. Voice, Automation, and Web Core online. Press Ctrl+C to shut down.")
 
     try:
         while True:
