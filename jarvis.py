@@ -57,6 +57,9 @@ PORT = '/dev/ttyACM0'
 BAUD = 9600
 arduino = None
 
+# ESP8266 Wi-Fi Integration
+ESP_IP = "192.168.0.239"
+
 try:
     arduino = serial.Serial(PORT, BAUD, timeout=0.1)
     time.sleep(2)
@@ -75,11 +78,11 @@ CORS(app)
 @app.route('/ask', methods=['POST'])
 def web_ask():
     data = request.json or {}
-    cmd = data.get("command", "").strip()
+    cmd = data.get("command", "").strip() or data.get("message", "").strip()
     print(f"[WEB COMMAND]: {cmd}")
     
     reply = process_command_logic(cmd, source="web")
-    return jsonify({"reply": reply})
+    return jsonify({"reply": reply, "response": reply})
 
 @app.route('/speak', methods=['POST'])
 def web_speak():
@@ -106,7 +109,7 @@ def web_speak():
         return jsonify({"error": str(e)}), 500
 
 def run_flask_server():
-    app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
+    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 
 def load_data():
     default_data = {
@@ -119,14 +122,15 @@ def load_data():
             "4. Include [TYPE(string)] when asked to type something on the computer.\n"
             "5. Include [CLICK_TEXT(word)] when asked to click a button or text on screen by its label.\n"
             "6. Include [PRESS(key)] when asked to press a specific key.\n"
-            "7. Include [PIN_ON(pin)], [PIN_OFF(pin)], or [PIN_TOGGLE(pin)] for digital hardware control (supports pins and analog pins like A0).\n"
+            "7. Include [PIN_ON(pin)], [PIN_OFF(pin)], or [PIN_TOGGLE(pin)] for wired digital hardware control.\n"
             "8. Include [PIN_READ(pin)] or [A_READ(pin)] to read digital or analog pin values.\n"
             "9. Include [A_WRITE(pin,value)] to write PWM analog output values (0-255).\n"
             "10. Include [UNO_VAR(name|data)] to store or update custom variables/states.\n"
             "11. Include [SET_ALARM(HH:MM|repeat|message)] to set alarms.\n"
             "12. Include [ALARM_VOLUME(percent)] to adjust system volume.\n"
             "13. Include [SLEEP] when told to go to sleep.\n"
-            "14. Include [SONG_PLAY(song|author)], [SONG_PAUSE], [SONG_RESUME], [SONG_SKIP], [PREV_SONG], [REWIND_SONG], [SHUFFLE_SONG], [LOOP_SONG(boolean)], or [PLAYLIST_PLAY(name)] for Spotify control."
+            "14. Include [SONG_PLAY(song|author)], [SONG_PAUSE], [SONG_RESUME], [SONG_SKIP], [PREV_SONG], [REWIND_SONG], [SHUFFLE_SONG], [LOOP_SONG(boolean)], or [PLAYLIST_PLAY(name)] for Spotify control.\n"
+            "15. Include [D1_COM(cmd)] for ESP8266 Wi-Fi hardware control where cmd is BON, BOFF, BTOGGLE, PIN_ON(pin), PIN_OFF(pin), or PIN_TOGGLE(pin)."
         ),
         "compressed_memory": "",
         "messages": [],
@@ -274,10 +278,39 @@ def handle_local_commands(command):
         return True
     return False
 
+def D1_COM(msg):
+    cmd = msg.strip().upper()
+    print(f"[J.A.R.V.I.S.] Routing to D1 ({ESP_IP}): {cmd}")
+    try:
+        if cmd == "BON":
+            res = requests.get(f"http://{ESP_IP}/bon", timeout=2)
+            return res.text
+        elif cmd == "BOFF":
+            res = requests.get(f"http://{ESP_IP}/boff", timeout=2)
+            return res.text
+        elif cmd == "BTOGGLE":
+            res = requests.get(f"http://{ESP_IP}/btoggle", timeout=2)
+            return res.text
+        elif cmd.startswith(("PIN_ON(", "PIN_OFF(", "PIN_TOGGLE(")):
+            res = requests.get(f"http://{ESP_IP}/cmd", params={"c": cmd}, timeout=2)
+            return res.text
+        else:
+            print(f"[D1_COM WARNING]: Unknown D1 command '{cmd}'")
+            return f"Unknown D1 command: {cmd}"
+    except requests.exceptions.RequestException as e:
+        print(f"[J.A.R.V.I.S.] D1 Communication Error: {e}")
+        return "Unable to reach the ESP8266 board over Wi-Fi."
+
 def handle_ai_tags_silent(reply_text):
     global is_asleep
     action_performed = False
     cleaned_text = reply_text
+
+    # Handle explicit [D1_COM(...)] tags from AI output
+    d1_matches = re.findall(r"\[D1_COM\((.*?)\)\]", cleaned_text)
+    for d1_cmd in d1_matches:
+        D1_COM(d1_cmd)
+        action_performed = True
 
     match_type = re.search(r"\[TYPE\((.*?)\)\]", cleaned_text)
     if match_type:
