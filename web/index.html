@@ -138,28 +138,44 @@
   </form>
 
   <script>
-    const SERVER_URL = "https://atticus-hp-z240-tower-workstation.tail932b25.ts.net/ask";
+    const BASE_URL = "https://atticus-hp-z240-tower-workstation.tail932b25.ts.net";
+    const ASK_URL = BASE_URL + "/ask";
+    const SPEAK_URL = BASE_URL + "/speak";
 
     const chat = document.getElementById("chat");
     const form = document.getElementById("controls");
     const input = document.getElementById("input");
     const micBtn = document.getElementById("mic-btn");
     const statusEl = document.getElementById("status");
+    let currentAudio = null;
 
-    function speakReply(text) {
-      if (!("speechSynthesis" in window)) return;
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      const voices = window.speechSynthesis.getVoices();
-      const ukVoice = voices.find(v => v.lang.includes("en-GB") && v.name.toLowerCase().includes("male"))
-                   || voices.find(v => v.lang.includes("en-GB"));
-      if (ukVoice) utterance.voice = ukVoice;
-      utterance.rate = 1.02;
-      window.speechSynthesis.speak(utterance);
+    function stopAudio() {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+      }
     }
 
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    async function speakReply(text) {
+      stopAudio();
+      try {
+        const res = await fetch(SPEAK_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true"
+          },
+          body: JSON.stringify({ text: text })
+        });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const audioUrl = URL.createObjectURL(blob);
+        currentAudio = new Audio(audioUrl);
+        currentAudio.onended = () => URL.revokeObjectURL(audioUrl);
+        await currentAudio.play();
+      } catch (err) {
+        console.error("Audio stream error:", err);
+      }
     }
 
     function addMessage(text, sender) {
@@ -180,7 +196,7 @@
       statusEl.textContent = "PROCESSING";
 
       try {
-        const res = await fetch(SERVER_URL, {
+        const res = await fetch(ASK_URL, {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",
@@ -204,6 +220,7 @@
 
     form.addEventListener("submit", (e) => {
       e.preventDefault();
+      stopAudio();
       sendCommand(input.value, false);
     });
 
@@ -215,9 +232,7 @@
       recognition.maxAlternatives = 1;
 
       micBtn.addEventListener("click", () => {
-        if ("speechSynthesis" in window) {
-          window.speechSynthesis.cancel();
-        }
+        stopAudio();
         if (micBtn.classList.contains("recording")) {
           recognition.stop();
         } else {
