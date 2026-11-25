@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>J.A.R.V.I.S.</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #090d16;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+    }
+    header {
+      padding: 16px;
+      background-color: #0f172a;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 {
+      font-size: 1.1rem;
+      letter-spacing: 2px;
+      color: #38bdf8;
+    }
+    #status {
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .msg {
+      padding: 12px 16px;
+      border-radius: 14px;
+      max-width: 82%;
+      line-height: 1.45;
+      font-size: 0.95rem;
+      word-wrap: break-word;
+    }
+    .user {
+      background-color: #0284c7;
+      color: #ffffff;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+    .bot {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      color: #f1f5f9;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+    #controls {
+      padding: 12px;
+      background-color: #0f172a;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    #input {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 24px;
+      border: 1px solid #334155;
+      background-color: #1e293b;
+      color: #ffffff;
+      font-size: 16px;
+      outline: none;
+    }
+    #input:focus {
+      border-color: #38bdf8;
+    }
+    button {
+      height: 44px;
+      border-radius: 22px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    button:active {
+      transform: scale(0.95);
+    }
+    #mic-btn {
+      width: 44px;
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      color: #38bdf8;
+      font-size: 1.2rem;
+    }
+    #mic-btn.recording {
+      background-color: #ef4444;
+      border-color: #ef4444;
+      color: #ffffff;
+      animation: pulse 1.2s infinite;
+    }
+    #send-btn {
+      padding: 0 20px;
+      background-color: #38bdf8;
+      color: #090d16;
+      font-size: 0.95rem;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>J.A.R.V.I.S.</h1>
+    <span id="status">ONLINE</span>
+  </header>
+
+  <div id="chat">
+    <div class="msg bot">Systems online. How may I assist you?</div>
+  </div>
+
+  <form id="controls">
+    <button type="button" id="mic-btn" title="Voice Input">🎤</button>
+    <input id="input" type="text" placeholder="Message J.A.R.V.I.S..." autocomplete="off" />
+    <button type="submit" id="send-btn">Enter</button>
+  </form>
+
+  <script>
+    // Replace these two values with your Cloudflare/Tailscale URL and your secret password
+    const SERVER_URL = "https://your-tunnel-url.trycloudflare.com/ask";
+    const API_SECRET = "your_chosen_password_here";
+
+    const chat = document.getElementById("chat");
+    const form = document.getElementById("controls");
+    const input = document.getElementById("input");
+    const micBtn = document.getElementById("mic-btn");
+    const statusEl = document.getElementById("status");
+
+    function addMessage(text, sender) {
+      const div = document.createElement("div");
+      div.className = "msg " + sender;
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      return div;
+    }
+
+    async function sendCommand(cmd) {
+      if (!cmd.trim()) return;
+      addMessage(cmd, "user");
+      input.value = "";
+      
+      const loadingBubble = addMessage("...", "bot");
+      statusEl.textContent = "PROCESSING";
+
+      try {
+        const res = await fetch(SERVER_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command: cmd, secret: API_SECRET })
+        });
+        const data = await res.json();
+        loadingBubble.textContent = data.reply || data.error || "No response.";
+        statusEl.textContent = "ONLINE";
+      } catch (err) {
+        loadingBubble.textContent = "Connection error: Workstation unreachable.";
+        statusEl.textContent = "OFFLINE";
+      }
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      sendCommand(input.value);
+    });
+
+    // Browser Speech-to-Text Setup
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      micBtn.addEventListener("click", () => {
+        if (micBtn.classList.contains("recording")) {
+          recognition.stop();
+        } else {
+          recognition.start();
+        }
+      });
+
+      recognition.onstart = () => {
+        micBtn.classList.add("recording");
+        input.placeholder = "Listening...";
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        sendCommand(transcript);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech error:", event.error);
+        input.placeholder = "Mic error: " + event.error;
+      };
+
+      recognition.onend = () => {
+        micBtn.classList.remove("recording");
+        input.placeholder = "Message J.A.R.V.I.S...";
+      };
+    } else {
+      micBtn.style.display = "none"; // Hide mic if browser doesn't support Speech API
+    }
+  </script>
+</body>
+</html>
+
