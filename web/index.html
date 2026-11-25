@@ -146,6 +146,22 @@
     const micBtn = document.getElementById("mic-btn");
     const statusEl = document.getElementById("status");
 
+    function speakReply(text) {
+      if (!("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voices = window.speechSynthesis.getVoices();
+      const ukVoice = voices.find(v => v.lang.includes("en-GB") && v.name.toLowerCase().includes("male"))
+                   || voices.find(v => v.lang.includes("en-GB"));
+      if (ukVoice) utterance.voice = ukVoice;
+      utterance.rate = 1.02;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+
     function addMessage(text, sender) {
       const div = document.createElement("div");
       div.className = "msg " + sender;
@@ -155,7 +171,7 @@
       return div;
     }
 
-    async function sendCommand(cmd) {
+    async function sendCommand(cmd, isVoice = false) {
       if (!cmd.trim()) return;
       addMessage(cmd, "user");
       input.value = "";
@@ -173,8 +189,13 @@
           body: JSON.stringify({ command: cmd })
         });
         const data = await res.json();
-        loadingBubble.textContent = data.reply || data.error || "No response.";
+        const replyText = data.reply || data.error || "No response.";
+        loadingBubble.textContent = replyText;
         statusEl.textContent = "ONLINE";
+
+        if (isVoice) {
+          speakReply(replyText);
+        }
       } catch (err) {
         loadingBubble.textContent = "Connection error: Workstation unreachable.";
         statusEl.textContent = "OFFLINE";
@@ -183,7 +204,7 @@
 
     form.addEventListener("submit", (e) => {
       e.preventDefault();
-      sendCommand(input.value);
+      sendCommand(input.value, false);
     });
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -194,6 +215,9 @@
       recognition.maxAlternatives = 1;
 
       micBtn.addEventListener("click", () => {
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+        }
         if (micBtn.classList.contains("recording")) {
           recognition.stop();
         } else {
@@ -208,7 +232,7 @@
 
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
-        sendCommand(transcript);
+        sendCommand(transcript, true);
       };
 
       recognition.onerror = (event) => {
