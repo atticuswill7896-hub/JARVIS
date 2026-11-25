@@ -137,9 +137,8 @@
     <button type="submit" id="send-btn">Enter</button>
   </form>
 
-<script>
-    // Your active Cloudflare tunnel URL ending with /ask
-    const SERVER_URL = "https://studying-aged-sheets-treat.trycloudflare.com/ask";
+  <script>
+    const SERVER_URL = "https://atticus-hp-z240-tower-workstation.tailnet-name.ts.net/ask";
 
     const chat = document.getElementById("chat");
     const form = document.getElementById("controls");
@@ -167,8 +166,11 @@
       try {
         const res = await fetch(SERVER_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ command: cmd }) // No secret needed
+          headers: { 
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true" 
+          },
+          body: JSON.stringify({ command: cmd })
         });
         const data = await res.json();
         loadingBubble.textContent = data.reply || data.error || "No response.";
@@ -184,7 +186,6 @@
       sendCommand(input.value);
     });
 
-    // Browser Speech-to-Text Setup
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
@@ -220,9 +221,8 @@
         input.placeholder = "Message J.A.R.V.I.S...";
       };
     } else {
-      micBtn.style.display = "none"; 
+      micBtn.style.display = "none";
     }
   </script>
 </body>
 </html>
-
