@@ -168,7 +168,6 @@
                 const data = await response.json();
                 appendMessage(data.reply || 'Command executed.', 'jarvis', data.raw_reply || '');
 
-                // Only play audio if the microphone listening mode is currently active
                 if (isMicActive) {
                     playLatestAudio();
                 }
@@ -282,17 +281,17 @@
                 }
                 spokenText = spokenText.trim();
 
-                const inputField = document.getElementById('chat-input');
-                if (inputField) {
-                    inputField.value = spokenText;
-                }
-
-                // Check if spoken text contains "jarvis" (case-insensitive wake word)
                 const lowerText = spokenText.toLowerCase();
+                
+                // Only act if "jarvis" is detected in the speech stream
                 if (lowerText.includes("jarvis")) {
-                    // Extract command part after "jarvis"
                     const parts = lowerText.split("jarvis");
                     const commandPart = parts[parts.length - 1].trim();
+
+                    const inputField = document.getElementById('chat-input');
+                    if (inputField) {
+                        inputField.value = commandPart;
+                    }
 
                     clearTimeout(silenceTimer);
                     if (commandPart.length > 0) {
