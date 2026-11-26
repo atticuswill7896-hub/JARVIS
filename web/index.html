@@ -16,7 +16,6 @@
             background: #374151;
             border-radius: 3px;
         }
-        /* Hide raw logs globally when raw-logs-hidden class is applied to body */
         body.raw-logs-hidden .raw-log-line {
             display: none;
         }
@@ -27,7 +26,7 @@
     <!-- Top Header -->
     <header class="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between shadow-md">
         <div class="flex items-center space-x-3">
-            <div class="w-3 h-3 bg-cyan-400 rounded-full animate-pulse shadow-[0_0_8px_#22d3ee]"></div>
+            <div id="status-indicator" class="w-3 h-3 bg-gray-500 rounded-full shadow-[0_0_8px_#6b7280]"></div>
             <h1 class="text-lg font-bold tracking-wider text-cyan-400">J.A.R.V.I.S. // WORKSTATION</h1>
         </div>
         
@@ -40,7 +39,6 @@
     <!-- Collapsible Admin Panel Drawer -->
     <div id="admin-panel" class="hidden bg-gray-800/95 border-b border-gray-700 px-4 py-3 text-xs">
         <div class="max-w-4xl mx-auto space-y-3">
-            <!-- Quick Hardware Controls & Raw Log Toggle -->
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <span class="text-gray-400 font-semibold">Quick Controls:</span>
                 <div class="flex flex-wrap gap-2">
@@ -50,7 +48,6 @@
                     <button onclick="sendQuickCommand('Go to sleep')" class="bg-red-900/60 hover:bg-red-700 text-red-200 px-3 py-1.5 rounded transition">Sleep Mode</button>
                     <button onclick="sendQuickCommand('Wake up')" class="bg-green-900/60 hover:bg-green-700 text-green-200 px-3 py-1.5 rounded transition">Wake Up</button>
                     
-                    <!-- Show/Hide Raw Logs Toggle Button (Default Raw = OFF state initially mapped) -->
                     <button id="toggle-raw-btn" onclick="toggleRawLogs()" 
                             class="bg-gray-700 hover:bg-gray-600 text-gray-400 border border-gray-600 px-3 py-1.5 rounded font-medium transition">
                         Raw Logs: OFF
@@ -58,7 +55,6 @@
                 </div>
             </div>
 
-            <!-- Custom Trigger Input Section -->
             <div class="flex items-center space-x-2 pt-2 border-t border-gray-700">
                 <span class="text-gray-400 font-semibold whitespace-nowrap">Trigger / Tag:</span>
                 <input id="admin-trigger-input" type="text" placeholder="e.g. [PIN_ON(D7)] or [GET_WEATHER(Pendleton, OR)]" 
@@ -76,7 +72,7 @@
         <div class="flex items-start space-x-3">
             <div class="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-xs font-bold text-white shadow">J</div>
             <div class="bg-gray-800 border border-gray-700 rounded-2xl px-4 py-3 max-w-[85%] sm:max-w-[75%] text-sm shadow-sm">
-                <p class="leading-relaxed">System online. Ready for text or voice directives.</p>
+                <p class="leading-relaxed">System online. Click mic to enable wake-word listening ("Jarvis").</p>
                 <span class="text-[10px] text-gray-500 mt-1 block">Just now</span>
             </div>
         </div>
@@ -89,7 +85,7 @@
     <footer class="bg-gray-800 border-t border-gray-700 p-4 shadow-lg">
         <div class="max-w-4xl mx-auto flex items-center space-x-2">
             <!-- Continuous Microphone Button Toggle -->
-            <button id="mic-button" onclick="toggleContinuousMic()" title="Toggle Voice Call Mode" 
+            <button id="mic-button" onclick="toggleContinuousMic()" title="Toggle Wake Word Listening" 
                     class="p-3 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
@@ -97,7 +93,7 @@
             </button>
 
             <!-- Text Input -->
-            <input id="chat-input" type="text" placeholder="Enter command or speak..." 
+            <input id="chat-input" type="text" placeholder="Say 'Jarvis [command]' or type here..." 
                    onkeydown="if(event.key === 'Enter') submitMessage()"
                    class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all">
 
@@ -115,10 +111,9 @@
         let recognition = null;
         let isMicActive = false;
         let silenceTimer = null;
-        let showRawLogs = false; // Default raw to OFF in admin panel configuration
+        let showRawLogs = false;
         const PAUSE_THRESHOLD_MS = 1500;
 
-        // Apply raw-logs-hidden on page load to match default OFF state
         document.addEventListener('DOMContentLoaded', () => {
             document.body.classList.add('raw-logs-hidden');
         });
@@ -173,8 +168,10 @@
                 const data = await response.json();
                 appendMessage(data.reply || 'Command executed.', 'jarvis', data.raw_reply || '');
 
-                // Automatically fetch and play the generated audio response from the backend
-                playLatestAudio();
+                // Only play audio if the microphone listening mode is currently active
+                if (isMicActive) {
+                    playLatestAudio();
+                }
 
             } catch (error) {
                 console.error('Error communicating with backend:', error);
@@ -269,34 +266,40 @@
             recognition.onstart = () => {
                 isMicActive = true;
                 const micButton = document.getElementById('mic-button');
+                const indicator = document.getElementById('status-indicator');
+                
                 micButton.classList.add('bg-red-600', 'text-white', 'shadow-[0_0_12px_#dc2626]');
                 micButton.classList.remove('bg-gray-700', 'text-gray-300');
+                
+                indicator.classList.remove('bg-gray-500', 'shadow-[0_0_8px_#6b7280]');
+                indicator.classList.add('bg-cyan-400', 'animate-pulse', 'shadow-[0_0_8px_#22d3ee]');
             };
 
             recognition.onresult = (event) => {
-                let interimText = '';
-                let finalText = '';
-
+                let spokenText = '';
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalText += event.results[i][0].transcript;
-                    } else {
-                        interimText += event.results[i][0].transcript;
-                    }
+                    spokenText += event.results[i][0].transcript;
                 }
+                spokenText = spokenText.trim();
 
-                const currentText = finalText || interimText;
                 const inputField = document.getElementById('chat-input');
                 if (inputField) {
-                    inputField.value = currentText;
+                    inputField.value = spokenText;
                 }
 
-                clearTimeout(silenceTimer);
-                
-                if (currentText.trim().length > 0) {
-                    silenceTimer = setTimeout(() => {
-                        triggerAutoSend(currentText.trim());
-                    }, PAUSE_THRESHOLD_MS);
+                // Check if spoken text contains "jarvis" (case-insensitive wake word)
+                const lowerText = spokenText.toLowerCase();
+                if (lowerText.includes("jarvis")) {
+                    // Extract command part after "jarvis"
+                    const parts = lowerText.split("jarvis");
+                    const commandPart = parts[parts.length - 1].trim();
+
+                    clearTimeout(silenceTimer);
+                    if (commandPart.length > 0) {
+                        silenceTimer = setTimeout(() => {
+                            triggerAutoSend(commandPart);
+                        }, PAUSE_THRESHOLD_MS);
+                    }
                 }
             };
 
@@ -333,8 +336,13 @@
                 recognition = null;
             }
             const micButton = document.getElementById('mic-button');
+            const indicator = document.getElementById('status-indicator');
+            
             micButton.classList.remove('bg-red-600', 'text-white', 'shadow-[0_0_12px_#dc2626]');
             micButton.classList.add('bg-gray-700', 'text-gray-300');
+            
+            indicator.classList.remove('bg-cyan-400', 'animate-pulse', 'shadow-[0_0_8px_#22d3ee]');
+            indicator.classList.add('bg-gray-500', 'shadow-[0_0_8px_#6b7280]');
         }
 
         function triggerAutoSend(messageText) {
