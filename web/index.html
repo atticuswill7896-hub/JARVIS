@@ -50,10 +50,10 @@
                     <button onclick="sendQuickCommand('Go to sleep')" class="bg-red-900/60 hover:bg-red-700 text-red-200 px-3 py-1.5 rounded transition">Sleep Mode</button>
                     <button onclick="sendQuickCommand('Wake up')" class="bg-green-900/60 hover:bg-green-700 text-green-200 px-3 py-1.5 rounded transition">Wake Up</button>
                     
-                    <!-- Show/Hide Raw Logs Toggle Button -->
+                    <!-- Show/Hide Raw Logs Toggle Button (Default Raw = OFF state initially mapped) -->
                     <button id="toggle-raw-btn" onclick="toggleRawLogs()" 
-                            class="bg-cyan-900/60 hover:bg-cyan-700 text-cyan-200 border border-cyan-500/40 px-3 py-1.5 rounded font-medium transition">
-                        Raw Logs: ON
+                            class="bg-gray-700 hover:bg-gray-600 text-gray-400 border border-gray-600 px-3 py-1.5 rounded font-medium transition">
+                        Raw Logs: OFF
                     </button>
                 </div>
             </div>
@@ -81,6 +81,9 @@
             </div>
         </div>
     </main>
+
+    <!-- Hidden audio element for speech streaming playback -->
+    <audio id="jarvis-audio" style="display:none;"></audio>
 
     <!-- Input Footer Bar -->
     <footer class="bg-gray-800 border-t border-gray-700 p-4 shadow-lg">
@@ -112,8 +115,13 @@
         let recognition = null;
         let isMicActive = false;
         let silenceTimer = null;
-        let showRawLogs = true;
+        let showRawLogs = false; // Default raw to OFF in admin panel configuration
         const PAUSE_THRESHOLD_MS = 1500;
+
+        // Apply raw-logs-hidden on page load to match default OFF state
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.classList.add('raw-logs-hidden');
+        });
 
         function toggleAdminPanel() {
             const panel = document.getElementById('admin-panel');
@@ -164,9 +172,28 @@
 
                 const data = await response.json();
                 appendMessage(data.reply || 'Command executed.', 'jarvis', data.raw_reply || '');
+
+                // Automatically fetch and play the generated audio response from the backend
+                playLatestAudio();
+
             } catch (error) {
                 console.error('Error communicating with backend:', error);
                 appendMessage('Error: Failed to reach J.A.R.V.I.S. backend workstation.', 'system');
+            }
+        }
+
+        async function playLatestAudio() {
+            try {
+                const audioRes = await fetch(`${BACKEND_URL}/get-audio`);
+                if (audioRes.ok) {
+                    const blob = await audioRes.blob();
+                    const audioUrl = URL.createObjectURL(blob);
+                    const audioElement = document.getElementById('jarvis-audio');
+                    audioElement.src = audioUrl;
+                    audioElement.play().catch(e => console.log("Audio autoplay prevented by browser:", e));
+                }
+            } catch (e) {
+                console.error("Failed to fetch audio stream:", e);
             }
         }
 
