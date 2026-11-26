@@ -93,11 +93,11 @@
 
             try {
                 // Send request to Flask backend
-                const response = await fetch(`${BACKEND_URL}/api/chat`, {
+                const response = await fetch(`${BACKEND_URL}/ask`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: message })
-                });
+            });
 
                 if (!response.ok) throw new Error('Network response was not ok');
 
