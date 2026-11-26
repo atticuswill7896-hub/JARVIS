@@ -16,6 +16,10 @@
             background: #374151;
             border-radius: 3px;
         }
+        /* Hide raw logs globally when raw-logs-hidden class is applied to body */
+        body.raw-logs-hidden .raw-log-line {
+            display: none;
+        }
     </style>
 </head>
 <body class="h-full flex flex-col text-gray-100 font-sans antialiased">
@@ -27,7 +31,6 @@
             <h1 class="text-lg font-bold tracking-wider text-cyan-400">J.A.R.V.I.S. // WORKSTATION</h1>
         </div>
         
-        <!-- Restored Admin Panel Button -->
         <button id="admin-panel-btn" onclick="toggleAdminPanel()" 
                 class="bg-gray-700 hover:bg-gray-600 text-cyan-400 border border-cyan-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
             Admin Panel
@@ -36,14 +39,34 @@
 
     <!-- Collapsible Admin Panel Drawer -->
     <div id="admin-panel" class="hidden bg-gray-800/95 border-b border-gray-700 px-4 py-3 text-xs">
-        <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-2">
-            <span class="text-gray-400">Quick Hardware & System Controls:</span>
-            <div class="flex flex-wrap gap-2">
-                <button onclick="sendQuickCommand('Turn on built in LED')" class="bg-gray-700 hover:bg-cyan-700 text-gray-200 px-3 py-1.5 rounded transition">D1 LED ON</button>
-                <button onclick="sendQuickCommand('Turn off built in LED')" class="bg-gray-700 hover:bg-cyan-700 text-gray-200 px-3 py-1.5 rounded transition">D1 LED OFF</button>
-                <button onclick="sendQuickCommand('Toggle built in LED')" class="bg-gray-700 hover:bg-cyan-700 text-gray-200 px-3 py-1.5 rounded transition">D1 Toggle</button>
-                <button onclick="sendQuickCommand('Go to sleep')" class="bg-red-900/60 hover:bg-red-700 text-red-200 px-3 py-1.5 rounded transition">Sleep Mode</button>
-                <button onclick="sendQuickCommand('Wake up')" class="bg-green-900/60 hover:bg-green-700 text-green-200 px-3 py-1.5 rounded transition">Wake Up</button>
+        <div class="max-w-4xl mx-auto space-y-3">
+            <!-- Quick Hardware Controls & Raw Log Toggle -->
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-gray-400 font-semibold">Quick Controls:</span>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="sendQuickCommand('Turn on built in LED')" class="bg-gray-700 hover:bg-cyan-700 text-gray-200 px-3 py-1.5 rounded transition">D1 LED ON</button>
+                    <button onclick="sendQuickCommand('Turn off built in LED')" class="bg-gray-700 hover:bg-cyan-700 text-gray-200 px-3 py-1.5 rounded transition">D1 LED OFF</button>
+                    <button onclick="sendQuickCommand('Toggle built in LED')" class="bg-gray-700 hover:bg-cyan-700 text-gray-200 px-3 py-1.5 rounded transition">D1 Toggle</button>
+                    <button onclick="sendQuickCommand('Go to sleep')" class="bg-red-900/60 hover:bg-red-700 text-red-200 px-3 py-1.5 rounded transition">Sleep Mode</button>
+                    <button onclick="sendQuickCommand('Wake up')" class="bg-green-900/60 hover:bg-green-700 text-green-200 px-3 py-1.5 rounded transition">Wake Up</button>
+                    
+                    <!-- Show/Hide Raw Logs Toggle Button -->
+                    <button id="toggle-raw-btn" onclick="toggleRawLogs()" 
+                            class="bg-cyan-900/60 hover:bg-cyan-700 text-cyan-200 border border-cyan-500/40 px-3 py-1.5 rounded font-medium transition">
+                        Raw Logs: ON
+                    </button>
+                </div>
+            </div>
+
+            <!-- Custom Trigger Input Section -->
+            <div class="flex items-center space-x-2 pt-2 border-t border-gray-700">
+                <span class="text-gray-400 font-semibold whitespace-nowrap">Trigger / Tag:</span>
+                <input id="admin-trigger-input" type="text" placeholder="e.g. [PIN_ON(D7)] or [GET_WEATHER(Pendleton, OR)]" 
+                       onkeydown="if(event.key === 'Enter') submitAdminTrigger()"
+                       class="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-100 placeholder-gray-500 focus:outline-none focus:border-cyan-500">
+                <button onclick="submitAdminTrigger()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-1.5 rounded font-medium transition">
+                    Send Trigger
+                </button>
             </div>
         </div>
     </div>
@@ -89,11 +112,29 @@
         let recognition = null;
         let isMicActive = false;
         let silenceTimer = null;
+        let showRawLogs = true;
         const PAUSE_THRESHOLD_MS = 1500;
 
         function toggleAdminPanel() {
             const panel = document.getElementById('admin-panel');
             panel.classList.toggle('hidden');
+        }
+
+        function toggleRawLogs() {
+            showRawLogs = !showRawLogs;
+            const btn = document.getElementById('toggle-raw-btn');
+            
+            if (showRawLogs) {
+                document.body.classList.remove('raw-logs-hidden');
+                btn.textContent = 'Raw Logs: ON';
+                btn.classList.remove('bg-gray-700', 'text-gray-400', 'border-gray-600');
+                btn.classList.add('bg-cyan-900/60', 'text-cyan-200', 'border-cyan-500/40');
+            } else {
+                document.body.classList.add('raw-logs-hidden');
+                btn.textContent = 'Raw Logs: OFF';
+                btn.classList.remove('bg-cyan-900/60', 'text-cyan-200', 'border-cyan-500/40');
+                btn.classList.add('bg-gray-700', 'text-gray-400', 'border-gray-600');
+            }
         }
 
         function sendQuickCommand(cmdText) {
@@ -102,12 +143,14 @@
             submitMessage();
         }
 
-        async function submitMessage() {
+        async function submitMessage(customText = null) {
             const inputField = document.getElementById('chat-input');
-            const message = inputField.value.trim();
+            const message = customText !== null ? customText : inputField.value.trim();
             if (!message) return;
 
-            inputField.value = '';
+            if (customText === null) {
+                inputField.value = '';
+            }
             appendMessage(message, 'user');
 
             try {
@@ -120,14 +163,23 @@
                 if (!response.ok) throw new Error('Network response was not ok');
 
                 const data = await response.json();
-                appendMessage(data.reply || 'Command executed.', 'jarvis');
+                appendMessage(data.reply || 'Command executed.', 'jarvis', data.raw_reply || '');
             } catch (error) {
                 console.error('Error communicating with backend:', error);
                 appendMessage('Error: Failed to reach J.A.R.V.I.S. backend workstation.', 'system');
             }
         }
 
-        function appendMessage(text, sender) {
+        function submitAdminTrigger() {
+            const triggerInput = document.getElementById('admin-trigger-input');
+            const triggerText = triggerInput.value.trim();
+            if (!triggerText) return;
+            
+            triggerInput.value = '';
+            submitMessage(triggerText);
+        }
+
+        function appendMessage(text, sender, rawReply = '') {
             const container = document.getElementById('chat-container');
             const messageDiv = document.createElement('div');
             messageDiv.className = `flex items-start space-x-3 ${sender === 'user' ? 'justify-end' : ''}`;
@@ -143,9 +195,15 @@
                     <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-xs font-bold text-white shadow">U</div>
                 `;
             } else {
+                let rawHtml = '';
+                if (rawReply) {
+                    rawHtml = `<div class="raw-log-line text-[11px] text-gray-400/60 font-mono mb-1.5 pb-1 border-b border-gray-700/50 select-all">RAW: ${escapeHtml(rawReply)}</div>`;
+                }
+
                 messageDiv.innerHTML = `
                     <div class="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-xs font-bold text-white shadow">J</div>
                     <div class="bg-gray-800 border border-gray-700 rounded-2xl px-4 py-3 max-w-[85%] sm:max-w-[75%] text-sm shadow-sm">
+                        ${rawHtml}
                         <p class="leading-relaxed">${escapeHtml(text)}</p>
                         <span class="text-[10px] text-gray-500 mt-1 block">${timeString}</span>
                     </div>
