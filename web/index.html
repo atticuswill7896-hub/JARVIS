@@ -30,9 +30,11 @@
 
     <!-- Chat Messages Container -->
     <main id="chat-container" class="flex-1 overflow-y-auto p-6 space-y-4">
-        <div class="flex justify-start">
+        <div class="flex flex-col items-start space-y-1">
+            <div class="bg-gray-800/90 backdrop-blur-md border border-cyan-700/60 rounded px-2.5 py-0.5 text-xs text-cyan-400 font-bold shadow">
+                [SYSTEM]
+            </div>
             <div class="bg-gray-900/80 backdrop-blur-md border border-cyan-800/60 rounded-lg p-4 max-w-xl text-sm text-gray-300 shadow-lg shadow-cyan-950/50">
-                <p class="text-cyan-400 font-bold mb-1">[SYSTEM]:</p>
                 <p id="system-welcome-msg">J.A.R.V.I.S. online. Please log in to unlock command transmission and admin controls.</p>
             </div>
         </div>
@@ -71,7 +73,6 @@
                 <button onclick="toggleAuthModal()" class="text-gray-500 hover:text-gray-300">✕</button>
             </div>
             <div class="space-y-4">
-                <!-- Display Name (Visible only during Registration) -->
                 <div id="display-name-container" class="hidden">
                     <label class="block text-xs text-gray-400 mb-1">DISPLAY NAME</label>
                     <input type="text" id="modal-display-name" placeholder="Tony Stark" class="w-full bg-gray-950 border border-cyan-800 rounded px-3 py-2 text-sm text-cyan-300 focus:outline-none focus:border-cyan-500">
@@ -89,7 +90,6 @@
                         </button>
                     </div>
                 </div>
-                <!-- Confirm Password (Visible only during Registration) -->
                 <div id="confirm-password-container" class="hidden">
                     <label class="block text-xs text-gray-400 mb-1">CONFIRM PASSWORD</label>
                     <div class="relative">
@@ -99,7 +99,6 @@
                         </button>
                     </div>
                 </div>
-                
                 <div class="flex gap-3 pt-2">
                     <button id="auth-action-btn" onclick="handleAuthAction()" class="flex-1 bg-cyan-900 hover:bg-cyan-800 text-cyan-200 py-2 rounded border border-cyan-700 text-sm font-bold transition">Login</button>
                 </div>
@@ -120,7 +119,6 @@
                 <button onclick="toggleAdminModal()" class="text-gray-500 hover:text-gray-300">✕</button>
             </div>
             <div class="space-y-4 text-sm text-gray-300">
-                <!-- Home Assistant User Linkage -->
                 <div class="bg-gray-950 p-3 rounded border border-gray-800 space-y-2">
                     <p class="font-bold text-cyan-300">Home Assistant User Mapping</p>
                     <p class="text-xs text-gray-500">Link your Home Assistant username for targeted routing & notifications.</p>
@@ -130,7 +128,6 @@
                     </div>
                 </div>
 
-                <!-- Raw Tags Toggle -->
                 <div class="flex items-center justify-between bg-gray-950 p-3 rounded border border-gray-800">
                     <div>
                         <p class="font-bold text-cyan-300">Show Raw AI Tags</p>
@@ -139,7 +136,6 @@
                     <input type="checkbox" id="raw-toggle" class="w-4 h-4 accent-amber-500">
                 </div>
 
-                <!-- Hardware Overrides -->
                 <div class="bg-gray-950 p-3 rounded border border-gray-800 space-y-2">
                     <p class="font-bold text-cyan-300">Quick Hardware Overrides</p>
                     <div class="flex gap-2">
@@ -185,7 +181,7 @@
             updateAuthUI(session);
         });
 
-        // Listen to raw toggle change and update ALL existing messages instantly on screen
+        // Instant toggle handler for raw tags across ALL existing messages on screen
         rawToggle.addEventListener('change', () => {
             const showRaw = rawToggle.checked;
             const messageBodies = document.querySelectorAll('.message-body');
@@ -397,15 +393,16 @@
             const displayedText = showRaw ? rawText : cleanText;
 
             const div = document.createElement('div');
-            div.className = 'flex justify-start';
+            div.className = 'flex flex-col items-start space-y-1';
             div.innerHTML = `
+                <div class="bg-gray-800/90 backdrop-blur-md border border-cyan-700/60 rounded px-2.5 py-0.5 text-xs ${colorClass} font-bold shadow">
+                    [${sender}]
+                </div>
                 <div class="bg-gray-900/80 backdrop-blur-md border border-cyan-800/60 rounded-lg p-4 max-w-xl text-sm text-gray-300 shadow-lg shadow-cyan-950/50">
-                    <p class="${colorClass} font-bold mb-1">[${sender}]:</p>
-                    <p class="message-body" data-clean="${encodeURIComponent(cleanText)}" data-raw="${encodeURIComponent(rawText)}">${displayedText}</p>
+                    <p class="message-body" data-clean="" data-raw="">${displayedText}</p>
                 </div>
             `;
             
-            // Fix decoding for attribute storage
             const bodyEl = div.querySelector('.message-body');
             bodyEl.setAttribute('data-clean', cleanText);
             bodyEl.setAttribute('data-raw', rawText);
