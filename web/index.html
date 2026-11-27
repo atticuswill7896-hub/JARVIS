@@ -181,7 +181,6 @@
             updateAuthUI(session);
         });
 
-        // Toggle visibility of all existing raw bubble wrappers instantly across screen
         rawToggle.addEventListener('change', () => {
             const showRaw = rawToggle.checked;
             const rawWrappers = document.querySelectorAll('.raw-bubble-wrapper');
@@ -347,7 +346,8 @@
             const cmd = commandInput.value.trim();
             if (!cmd) return;
 
-            appendMessage('USER', cmd, cmd, 'text-cyan-600');
+            // User message (Right-aligned)
+            appendMessage('USER', cmd, '', 'text-cyan-600', 'items-end');
             commandInput.value = '';
 
             try {
@@ -367,11 +367,12 @@
                 const cleanReply = data.reply || '';
                 const rawReply = data.raw_reply || cleanReply;
 
-                appendMessage('J.A.R.V.I.S.', cleanReply, rawReply, 'text-cyan-400');
+                // JARVIS message (Left-aligned with optional raw preview card)
+                appendMessage('J.A.R.V.I.S.', cleanReply, rawReply, 'text-cyan-400', 'items-start');
                 fetchAudioStream();
 
             } catch (err) {
-                appendMessage('SYSTEM', 'Connection error to local backend core.', 'Connection error to local backend core.', 'text-red-500');
+                appendMessage('SYSTEM', 'Connection error to local backend core.', '', 'text-red-500', 'items-start');
             }
         }
 
@@ -388,29 +389,33 @@
             }
         }
 
-        function appendMessage(sender, cleanText, rawText, colorClass) {
+        function appendMessage(sender, cleanText, rawText, colorClass, alignmentClass) {
             const showRaw = rawToggle.checked;
-            const rawHiddenClass = showRaw ? '' : 'hidden';
+            const hasRaw = sender === 'J.A.R.V.I.S.' && rawText && rawText !== cleanText;
+            const rawHiddenClass = (showRaw && hasRaw) ? '' : 'hidden';
 
             const div = document.createElement('div');
-            div.className = 'flex flex-col items-start space-y-2';
-            div.innerHTML = `
-                <!-- Raw AI Bubble Wrapper (Appears above main message when raw toggle is active) -->
-                <div class="raw-bubble-wrapper ${rawHiddenClass} flex flex-col items-start space-y-1 w-full max-w-xl">
-                    <div class="bg-amber-950/90 backdrop-blur-md border border-amber-600/60 rounded px-2 py-0.5 text-xs text-amber-400 font-bold shadow">
-                        [GROQ RAW]
+            div.className = `flex flex-col ${alignmentClass} space-y-2 w-full`;
+            
+            let rawHtml = '';
+            if (sender === 'J.A.R.V.I.S.' && rawText) {
+                rawHtml = `
+                    <div class="raw-bubble-wrapper ${rawHiddenClass} flex flex-col items-start space-y-1 w-full max-w-xl">
+                        <div class="bg-amber-950/90 backdrop-blur-md border border-amber-600/60 rounded px-2 py-0.5 text-xs text-amber-400 font-bold shadow">
+                            [GROQ RAW]
+                        </div>
+                        <div class="bg-gray-900/80 backdrop-blur-md border border-amber-800/60 rounded-lg p-3 w-full text-xs text-amber-200/90 font-mono shadow-lg">
+                            ${rawText}
+                        </div>
                     </div>
-                    <div class="bg-gray-900/80 backdrop-blur-md border border-amber-800/60 rounded-lg p-3 w-full text-xs text-amber-200/90 font-mono shadow-lg">
-                        ${rawText}
-                    </div>
-                </div>
+                `;
+            }
 
-                <!-- Main Sender Badge -->
+            div.innerHTML = `
+                ${rawHtml}
                 <div class="bg-gray-800/90 backdrop-blur-md border border-cyan-700/60 rounded px-2.5 py-0.5 text-xs ${colorClass} font-bold shadow">
                     [${sender}]
                 </div>
-
-                <!-- Main Message Content Bubble -->
                 <div class="bg-gray-900/80 backdrop-blur-md border border-cyan-800/60 rounded-lg p-4 max-w-xl text-sm text-gray-300 shadow-lg shadow-cyan-950/50">
                     <p>${cleanText}</p>
                 </div>
