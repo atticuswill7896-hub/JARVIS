@@ -13,12 +13,9 @@
     <header class="bg-gray-900 border-b border-cyan-800 p-4 flex justify-between items-center">
         <h1 class="text-xl font-bold tracking-wider">J.A.R.V.I.S. // SECURE TERMINAL</h1>
         <div id="auth-container" class="flex items-center space-x-3">
-            <!-- Shown when logged OUT -->
             <button id="login-btn" onclick="toggleAuthModal()" class="bg-cyan-900 hover:bg-cyan-800 text-cyan-200 px-4 py-1.5 rounded border border-cyan-700 text-sm font-bold transition">
                 Login
             </button>
-
-            <!-- Shown ONLY when logged IN (Replaces Login button) -->
             <div id="admin-controls" class="hidden flex items-center space-x-3">
                 <span id="user-email" class="text-xs text-gray-400 hidden sm:inline"></span>
                 <button id="admin-panel-btn" onclick="toggleAdminModal()" class="bg-amber-950 hover:bg-amber-900 text-amber-300 px-4 py-1.5 rounded border border-amber-700 text-sm font-bold transition">
@@ -98,6 +95,17 @@
                 <button onclick="toggleAdminModal()" class="text-gray-500 hover:text-gray-300">✕</button>
             </div>
             <div class="space-y-4 text-sm text-gray-300">
+                <!-- Home Assistant User Linkage -->
+                <div class="bg-gray-950 p-3 rounded border border-gray-800 space-y-2">
+                    <p class="font-bold text-cyan-300">Home Assistant User Mapping</p>
+                    <p class="text-xs text-gray-500">Link your Home Assistant username for targeted routing & notifications.</p>
+                    <div class="flex gap-2">
+                        <input type="text" id="ha-username-input" placeholder="e.g. cornbreadarmada" class="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-xs text-cyan-300 focus:outline-none focus:border-cyan-500">
+                        <button onclick="saveHaUsername()" class="bg-cyan-900 hover:bg-cyan-800 text-cyan-200 px-3 py-1.5 rounded text-xs border border-cyan-700 transition">Save</button>
+                    </div>
+                </div>
+
+                <!-- Raw Tags Toggle -->
                 <div class="flex items-center justify-between bg-gray-950 p-3 rounded border border-gray-800">
                     <div>
                         <p class="font-bold text-cyan-300">Show Raw AI Tags</p>
@@ -105,6 +113,8 @@
                     </div>
                     <input type="checkbox" id="raw-toggle" class="w-4 h-4 accent-amber-500">
                 </div>
+
+                <!-- Hardware Overrides -->
                 <div class="bg-gray-950 p-3 rounded border border-gray-800 space-y-2">
                     <p class="font-bold text-cyan-300">Quick Hardware Overrides</p>
                     <div class="flex gap-2">
@@ -119,7 +129,6 @@
 
     <!-- Frontend Integration Script -->
     <script>
-        // Replace with your Supabase Project URL and Anon Key
         const SUPABASE_URL = 'YOUR_SUPABASE_URL';
         const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -129,14 +138,53 @@
         const transmitBtn = document.getElementById('transmit-btn');
         const audioPlayer = document.getElementById('audio-player');
 
-        // Check active session on load
+        let currentUser = null;
+
         supabaseClient.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                currentUser = session.user;
+                fetchUserProfile(currentUser.id);
+            }
             updateAuthUI(session);
         });
 
         supabaseClient.auth.onAuthStateChange((_event, session) => {
+            if (session) {
+                currentUser = session.user;
+                fetchUserProfile(currentUser.id);
+            } else {
+                currentUser = null;
+            }
             updateAuthUI(session);
         });
+
+        async function fetchUserProfile(userId) {
+            const { data, error } = await supabaseClient
+                .from('profiles')
+                .select('ha_username')
+                .eq('id', userId)
+                .single();
+            
+            if (data && data.ha_username) {
+                document.getElementById('ha-username-input').value = data.ha_username;
+            }
+        }
+
+        async function saveHaUsername() {
+            if (!currentUser) return;
+            const haUsername = document.getElementById('ha-username-input').value.trim();
+            
+            const { error } = await supabaseClient
+                .from('profiles')
+                .update({ ha_username: haUsername })
+                .eq('id', currentUser.id);
+
+            if (error) {
+                alert('Error updating Home Assistant username: ' + error.message);
+            } else {
+                alert('Home Assistant username saved successfully.');
+            }
+        }
 
         function updateAuthUI(session) {
             const loginBtn = document.getElementById('login-btn');
@@ -145,23 +193,19 @@
             const welcomeMsg = document.getElementById('system-welcome-msg');
 
             if (session) {
-                // Swap Login button for Admin Panel + Sign Out
                 loginBtn.classList.add('hidden');
                 adminControls.classList.remove('hidden');
                 userEmail.textContent = session.user.email;
 
-                // Enable command input
                 commandInput.disabled = false;
                 transmitBtn.disabled = false;
                 commandInput.placeholder = "Enter command for J.A.R.V.I.S....";
                 welcomeMsg.textContent = "Authentication verified. Systems online and awaiting your command, sir.";
             } else {
-                // Swap Admin Panel back to Login button
                 loginBtn.classList.remove('hidden');
                 adminControls.classList.add('hidden');
                 userEmail.textContent = '';
 
-                // Lock command input
                 commandInput.disabled = true;
                 transmitBtn.disabled = true;
                 commandInput.placeholder = "Authenticate via Login button to transmit commands...";
