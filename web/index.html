@@ -181,15 +181,15 @@
             updateAuthUI(session);
         });
 
-        // Instant toggle handler for raw tags across ALL existing messages on screen
+        // Toggle visibility of all existing raw bubble wrappers instantly across screen
         rawToggle.addEventListener('change', () => {
             const showRaw = rawToggle.checked;
-            const messageBodies = document.querySelectorAll('.message-body');
-            messageBodies.forEach(el => {
-                const cleanText = el.getAttribute('data-clean');
-                const rawText = el.getAttribute('data-raw');
-                if (cleanText !== null && rawText !== null) {
-                    el.textContent = showRaw ? rawText : cleanText;
+            const rawWrappers = document.querySelectorAll('.raw-bubble-wrapper');
+            rawWrappers.forEach(el => {
+                if (showRaw) {
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
                 }
             });
         });
@@ -390,23 +390,32 @@
 
         function appendMessage(sender, cleanText, rawText, colorClass) {
             const showRaw = rawToggle.checked;
-            const displayedText = showRaw ? rawText : cleanText;
+            const rawHiddenClass = showRaw ? '' : 'hidden';
 
             const div = document.createElement('div');
-            div.className = 'flex flex-col items-start space-y-1';
+            div.className = 'flex flex-col items-start space-y-2';
             div.innerHTML = `
+                <!-- Raw AI Bubble Wrapper (Appears above main message when raw toggle is active) -->
+                <div class="raw-bubble-wrapper ${rawHiddenClass} flex flex-col items-start space-y-1 w-full max-w-xl">
+                    <div class="bg-amber-950/90 backdrop-blur-md border border-amber-600/60 rounded px-2 py-0.5 text-xs text-amber-400 font-bold shadow">
+                        [GROQ RAW]
+                    </div>
+                    <div class="bg-gray-900/80 backdrop-blur-md border border-amber-800/60 rounded-lg p-3 w-full text-xs text-amber-200/90 font-mono shadow-lg">
+                        ${rawText}
+                    </div>
+                </div>
+
+                <!-- Main Sender Badge -->
                 <div class="bg-gray-800/90 backdrop-blur-md border border-cyan-700/60 rounded px-2.5 py-0.5 text-xs ${colorClass} font-bold shadow">
                     [${sender}]
                 </div>
+
+                <!-- Main Message Content Bubble -->
                 <div class="bg-gray-900/80 backdrop-blur-md border border-cyan-800/60 rounded-lg p-4 max-w-xl text-sm text-gray-300 shadow-lg shadow-cyan-950/50">
-                    <p class="message-body" data-clean="" data-raw="">${displayedText}</p>
+                    <p>${cleanText}</p>
                 </div>
             `;
             
-            const bodyEl = div.querySelector('.message-body');
-            bodyEl.setAttribute('data-clean', cleanText);
-            bodyEl.setAttribute('data-raw', rawText);
-
             chatContainer.appendChild(div);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
