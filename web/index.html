@@ -247,7 +247,6 @@
             document.getElementById('admin-modal').classList.toggle('hidden');
         }
 
-        // Switch modal view between Login and Register modes
         function switchAuthMode() {
             isRegistering = !isRegistering;
             const displayNameContainer = document.getElementById('display-name-container');
@@ -268,7 +267,6 @@
             }
         }
 
-        // Toggle password show/hide visibility
         function togglePasswordVisibility(fieldId, iconId) {
             const passwordField = document.getElementById(fieldId);
             const icon = document.getElementById(iconId);
@@ -281,7 +279,6 @@
             }
         }
 
-        // Unified handler for Login or Register based on modal state
         async function handleAuthAction() {
             const email = document.getElementById('modal-email').value.trim();
             const password = document.getElementById('modal-password').value;
@@ -344,15 +341,21 @@
             commandInput.value = '';
 
             try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                const accessToken = session ? session.access_token : '';
+
                 const response = await fetch('http://localhost:5000/ask', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': accessToken ? `Bearer ${accessToken}` : ''
+                    },
                     body: JSON.stringify({ command: cmd })
                 });
 
                 const data = await response.json();
                 const showRaw = document.getElementById('raw-toggle').checked;
-                const displayText = showRaw ? data.raw_reply : data.reply;
+                const displayText = showRaw ? (data.raw_reply || data.reply) : data.reply;
 
                 appendMessage('J.A.R.V.I.S.', displayText, 'text-cyan-400');
                 fetchAudioStream();
