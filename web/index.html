@@ -10,7 +10,7 @@
 <body class="bg-gray-950 text-cyan-400 font-mono h-screen flex flex-col justify-between">
 
     <!-- Auth / Header Bar -->
-    <header class="bg-gray-900 border-b border-cyan-800 p-4 flex justify-between items-center">
+    <header class="bg-gray-900/80 backdrop-blur-md border-b border-cyan-800 p-4 flex justify-between items-center">
         <h1 class="text-xl font-bold tracking-wider">J.A.R.V.I.S. // SECURE TERMINAL</h1>
         <div id="auth-container" class="flex items-center space-x-3">
             <button id="login-btn" onclick="toggleAuthModal()" class="bg-cyan-900 hover:bg-cyan-800 text-cyan-200 px-4 py-1.5 rounded border border-cyan-700 text-sm font-bold transition">
@@ -31,7 +31,7 @@
     <!-- Chat Messages Container -->
     <main id="chat-container" class="flex-1 overflow-y-auto p-6 space-y-4">
         <div class="flex justify-start">
-            <div class="bg-gray-900 border border-cyan-800 rounded-lg p-4 max-w-xl text-sm text-gray-300 shadow-lg shadow-cyan-950/50">
+            <div class="bg-gray-900/80 backdrop-blur-md border border-cyan-800/60 rounded-lg p-4 max-w-xl text-sm text-gray-300 shadow-lg shadow-cyan-950/50">
                 <p class="text-cyan-400 font-bold mb-1">[SYSTEM]:</p>
                 <p id="system-welcome-msg">J.A.R.V.I.S. online. Please log in to unlock command transmission and admin controls.</p>
             </div>
@@ -42,7 +42,7 @@
     <audio id="audio-player" class="hidden"></audio>
 
     <!-- Command Input Footer -->
-    <footer class="bg-gray-900 border-t border-cyan-800 p-4">
+    <footer class="bg-gray-900/80 backdrop-blur-md border-t border-cyan-800 p-4">
         <form id="command-form" onsubmit="handleCommand(event)" class="flex gap-3 max-w-5xl mx-auto">
             <input 
                 type="text" 
@@ -65,7 +65,7 @@
 
     <!-- Login / Sign Up Modal -->
     <div id="auth-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-gray-900 border border-cyan-800 rounded-lg p-6 w-full max-w-md shadow-2xl">
+        <div class="bg-gray-900/90 backdrop-blur-md border border-cyan-800 rounded-lg p-6 w-full max-w-md shadow-2xl">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-lg font-bold text-cyan-300">System Authentication</h2>
                 <button onclick="toggleAuthModal()" class="text-gray-500 hover:text-gray-300">✕</button>
@@ -114,7 +114,7 @@
 
     <!-- Admin Panel Modal -->
     <div id="admin-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-gray-900 border border-amber-700 rounded-lg p-6 w-full max-w-lg shadow-2xl">
+        <div class="bg-gray-900/90 backdrop-blur-md border border-amber-700 rounded-lg p-6 w-full max-w-lg shadow-2xl">
             <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
                 <h2 class="text-lg font-bold text-amber-400">J.A.R.V.I.S. // ADMIN OVERRIDE</h2>
                 <button onclick="toggleAdminModal()" class="text-gray-500 hover:text-gray-300">✕</button>
@@ -162,9 +162,10 @@
         const commandInput = document.getElementById('command-input');
         const transmitBtn = document.getElementById('transmit-btn');
         const audioPlayer = document.getElementById('audio-player');
+        const rawToggle = document.getElementById('raw-toggle');
 
         let currentUser = null;
-        let isRegistering = false; // Toggle state between Login and Register
+        let isRegistering = false;
 
         supabaseClient.auth.getSession().then(({ data: { session } }) => {
             if (session) {
@@ -182,6 +183,19 @@
                 currentUser = null;
             }
             updateAuthUI(session);
+        });
+
+        // Listen to raw toggle change and update ALL existing messages instantly on screen
+        rawToggle.addEventListener('change', () => {
+            const showRaw = rawToggle.checked;
+            const messageBodies = document.querySelectorAll('.message-body');
+            messageBodies.forEach(el => {
+                const cleanText = el.getAttribute('data-clean');
+                const rawText = el.getAttribute('data-raw');
+                if (cleanText !== null && rawText !== null) {
+                    el.textContent = showRaw ? rawText : cleanText;
+                }
+            });
         });
 
         async function fetchUserProfile(userId) {
@@ -337,7 +351,7 @@
             const cmd = commandInput.value.trim();
             if (!cmd) return;
 
-            appendMessage('USER', cmd, 'text-cyan-600');
+            appendMessage('USER', cmd, cmd, 'text-cyan-600');
             commandInput.value = '';
 
             try {
@@ -354,14 +368,14 @@
                 });
 
                 const data = await response.json();
-                const showRaw = document.getElementById('raw-toggle').checked;
-                const displayText = showRaw ? (data.raw_reply || data.reply) : data.reply;
+                const cleanReply = data.reply || '';
+                const rawReply = data.raw_reply || cleanReply;
 
-                appendMessage('J.A.R.V.I.S.', displayText, 'text-cyan-400');
+                appendMessage('J.A.R.V.I.S.', cleanReply, rawReply, 'text-cyan-400');
                 fetchAudioStream();
 
             } catch (err) {
-                appendMessage('SYSTEM', 'Connection error to local backend core.', 'text-red-500');
+                appendMessage('SYSTEM', 'Connection error to local backend core.', 'Connection error to local backend core.', 'text-red-500');
             }
         }
 
@@ -378,15 +392,24 @@
             }
         }
 
-        function appendMessage(sender, text, colorClass) {
+        function appendMessage(sender, cleanText, rawText, colorClass) {
+            const showRaw = rawToggle.checked;
+            const displayedText = showRaw ? rawText : cleanText;
+
             const div = document.createElement('div');
             div.className = 'flex justify-start';
             div.innerHTML = `
-                <div class="bg-gray-900 border border-cyan-800 rounded-lg p-4 max-w-xl text-sm text-gray-300 shadow-lg shadow-cyan-950/50">
+                <div class="bg-gray-900/80 backdrop-blur-md border border-cyan-800/60 rounded-lg p-4 max-w-xl text-sm text-gray-300 shadow-lg shadow-cyan-950/50">
                     <p class="${colorClass} font-bold mb-1">[${sender}]:</p>
-                    <p>${text}</p>
+                    <p class="message-body" data-clean="${encodeURIComponent(cleanText)}" data-raw="${encodeURIComponent(rawText)}">${displayedText}</p>
                 </div>
             `;
+            
+            // Fix decoding for attribute storage
+            const bodyEl = div.querySelector('.message-body');
+            bodyEl.setAttribute('data-clean', cleanText);
+            bodyEl.setAttribute('data-raw', rawText);
+
             chatContainer.appendChild(div);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
