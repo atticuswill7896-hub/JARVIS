@@ -71,17 +71,42 @@
                 <button onclick="toggleAuthModal()" class="text-gray-500 hover:text-gray-300">✕</button>
             </div>
             <div class="space-y-4">
+                <!-- Display Name (Visible only during Registration) -->
+                <div id="display-name-container" class="hidden">
+                    <label class="block text-xs text-gray-400 mb-1">DISPLAY NAME</label>
+                    <input type="text" id="modal-display-name" placeholder="Tony Stark" class="w-full bg-gray-950 border border-cyan-800 rounded px-3 py-2 text-sm text-cyan-300 focus:outline-none focus:border-cyan-500">
+                </div>
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">EMAIL</label>
-                    <input type="email" id="modal-email" class="w-full bg-gray-950 border border-cyan-800 rounded px-3 py-2 text-sm text-cyan-300 focus:outline-none focus:border-cyan-500">
+                    <input type="email" id="modal-email" placeholder="jarvis@stark.com" class="w-full bg-gray-950 border border-cyan-800 rounded px-3 py-2 text-sm text-cyan-300 focus:outline-none focus:border-cyan-500">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">PASSWORD</label>
-                    <input type="password" id="modal-password" class="w-full bg-gray-950 border border-cyan-800 rounded px-3 py-2 text-sm text-cyan-300 focus:outline-none focus:border-cyan-500">
+                    <div class="relative">
+                        <input type="password" id="modal-password" class="w-full bg-gray-950 border border-cyan-800 rounded px-3 py-2 text-sm text-cyan-300 focus:outline-none focus:border-cyan-500 pr-10">
+                        <button type="button" onclick="togglePasswordVisibility('modal-password', 'eye-icon-1')" class="absolute right-3 top-2.5 text-gray-400 hover:text-cyan-300 text-xs">
+                            <span id="eye-icon-1">👁️</span>
+                        </button>
+                    </div>
                 </div>
+                <!-- Confirm Password (Visible only during Registration) -->
+                <div id="confirm-password-container" class="hidden">
+                    <label class="block text-xs text-gray-400 mb-1">CONFIRM PASSWORD</label>
+                    <div class="relative">
+                        <input type="password" id="modal-confirm-password" class="w-full bg-gray-950 border border-cyan-800 rounded px-3 py-2 text-sm text-cyan-300 focus:outline-none focus:border-cyan-500 pr-10">
+                        <button type="button" onclick="togglePasswordVisibility('modal-confirm-password', 'eye-icon-2')" class="absolute right-3 top-2.5 text-gray-400 hover:text-cyan-300 text-xs">
+                            <span id="eye-icon-2">👁️</span>
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="flex gap-3 pt-2">
-                    <button onclick="supabaseSignIn()" class="flex-1 bg-cyan-900 hover:bg-cyan-800 text-cyan-200 py-2 rounded border border-cyan-700 text-sm font-bold transition">Login</button>
-                    <button onclick="supabaseSignUp()" class="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded border border-gray-700 text-sm transition">Register</button>
+                    <button id="auth-action-btn" onclick="handleAuthAction()" class="flex-1 bg-cyan-900 hover:bg-cyan-800 text-cyan-200 py-2 rounded border border-cyan-700 text-sm font-bold transition">Login</button>
+                </div>
+                <div class="text-center pt-2">
+                    <button type="button" onclick="switchAuthMode()" id="auth-switch-text" class="text-xs text-gray-400 hover:text-cyan-300 underline">
+                        Need an account? Register here
+                    </button>
                 </div>
             </div>
         </div>
@@ -139,6 +164,7 @@
         const audioPlayer = document.getElementById('audio-player');
 
         let currentUser = null;
+        let isRegistering = false; // Toggle state between Login and Register
 
         supabaseClient.auth.getSession().then(({ data: { session } }) => {
             if (session) {
@@ -221,20 +247,81 @@
             document.getElementById('admin-modal').classList.toggle('hidden');
         }
 
-        async function supabaseSignIn() {
-            const email = document.getElementById('modal-email').value;
-            const password = document.getElementById('modal-password').value;
-            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) alert(error.message);
-            else toggleAuthModal();
+        // Switch modal view between Login and Register modes
+        function switchAuthMode() {
+            isRegistering = !isRegistering;
+            const displayNameContainer = document.getElementById('display-name-container');
+            const confirmPasswordContainer = document.getElementById('confirm-password-container');
+            const actionBtn = document.getElementById('auth-action-btn');
+            const switchText = document.getElementById('auth-switch-text');
+
+            if (isRegistering) {
+                displayNameContainer.classList.remove('hidden');
+                confirmPasswordContainer.classList.remove('hidden');
+                actionBtn.textContent = 'Register';
+                switchText.textContent = 'Already have an account? Login here';
+            } else {
+                displayNameContainer.classList.add('hidden');
+                confirmPasswordContainer.classList.add('hidden');
+                actionBtn.textContent = 'Login';
+                switchText.textContent = 'Need an account? Register here';
+            }
         }
 
-        async function supabaseSignUp() {
-            const email = document.getElementById('modal-email').value;
+        // Toggle password show/hide visibility
+        function togglePasswordVisibility(fieldId, iconId) {
+            const passwordField = document.getElementById(fieldId);
+            const icon = document.getElementById(iconId);
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+                icon.textContent = '🙈';
+            } else {
+                passwordField.type = 'password';
+                icon.textContent = '👁️';
+            }
+        }
+
+        // Unified handler for Login or Register based on modal state
+        async function handleAuthAction() {
+            const email = document.getElementById('modal-email').value.trim();
             const password = document.getElementById('modal-password').value;
-            const { error } = await supabaseClient.auth.signUp({ email, password });
-            if (error) alert(error.message);
-            else alert('Registration successful. Check your email for confirmation.');
+
+            if (!email || !password) {
+                alert('Please enter both email and password.');
+                return;
+            }
+
+            if (isRegistering) {
+                const fullName = document.getElementById('modal-display-name').value.trim();
+                const confirmPassword = document.getElementById('modal-confirm-password').value;
+
+                if (password !== confirmPassword) {
+                    alert('Passwords do not match.');
+                    return;
+                }
+
+                const { error } = await supabaseClient.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: { full_name: fullName }
+                    }
+                });
+
+                if (error) {
+                    alert(error.message);
+                } else {
+                    alert('Registration successful! Check your email for confirmation.');
+                    toggleAuthModal();
+                }
+            } else {
+                const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) {
+                    alert(error.message);
+                } else {
+                    toggleAuthModal();
+                }
+            }
         }
 
         async function supabaseSignOut() {
