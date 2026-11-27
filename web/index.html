@@ -1,354 +1,260 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-gray-900">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>J.A.R.V.I.S. Command Interface</title>
+    <title>J.A.R.V.I.S. Interface</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #1f2937;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #374151;
-            border-radius: 3px;
-        }
-        body.raw-logs-hidden .raw-log-line {
-            display: none;
-        }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="h-full flex flex-col text-gray-100 font-sans antialiased">
+<body class="bg-gray-950 text-cyan-400 font-mono h-screen flex flex-col justify-between">
 
-    <!-- Top Header -->
-    <header class="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between shadow-md">
-        <div class="flex items-center space-x-3">
-            <div id="status-indicator" class="w-3 h-3 bg-gray-500 rounded-full shadow-[0_0_8px_#6b7280]"></div>
-            <h1 class="text-lg font-bold tracking-wider text-cyan-400">J.A.R.V.I.S. // WORKSTATION</h1>
-        </div>
-        
-        <button id="admin-panel-btn" onclick="toggleAdminPanel()" 
-                class="bg-gray-700 hover:bg-gray-600 text-cyan-400 border border-cyan-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
-            Admin Panel
-        </button>
-    </header>
+    <!-- Auth / Header Bar -->
+    <header class="bg-gray-900 border-b border-cyan-800 p-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold tracking-wider">J.A.R.V.I.S. // SECURE TERMINAL</h1>
+        <div id="auth-container" class="flex items-center space-x-3">
+            <!-- Shown when logged OUT -->
+            <button id="login-btn" onclick="toggleAuthModal()" class="bg-cyan-900 hover:bg-cyan-800 text-cyan-200 px-4 py-1.5 rounded border border-cyan-700 text-sm font-bold transition">
+                Login
+            </button>
 
-    <!-- Collapsible Admin Panel Drawer -->
-    <div id="admin-panel" class="hidden bg-gray-800/95 border-b border-gray-700 px-4 py-3 text-xs">
-        <div class="max-w-4xl mx-auto space-y-3">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <span class="text-gray-400 font-semibold">Quick Controls:</span>
-                <div class="flex flex-wrap gap-2">
-                    <button onclick="sendQuickCommand('Turn on built in LED')" class="bg-gray-700 hover:bg-cyan-700 text-gray-200 px-3 py-1.5 rounded transition">D1 LED ON</button>
-                    <button onclick="sendQuickCommand('Turn off built in LED')" class="bg-gray-700 hover:bg-cyan-700 text-gray-200 px-3 py-1.5 rounded transition">D1 LED OFF</button>
-                    <button onclick="sendQuickCommand('Toggle built in LED')" class="bg-gray-700 hover:bg-cyan-700 text-gray-200 px-3 py-1.5 rounded transition">D1 Toggle</button>
-                    <button onclick="sendQuickCommand('Go to sleep')" class="bg-red-900/60 hover:bg-red-700 text-red-200 px-3 py-1.5 rounded transition">Sleep Mode</button>
-                    <button onclick="sendQuickCommand('Wake up')" class="bg-green-900/60 hover:bg-green-700 text-green-200 px-3 py-1.5 rounded transition">Wake Up</button>
-                    
-                    <button id="toggle-raw-btn" onclick="toggleRawLogs()" 
-                            class="bg-gray-700 hover:bg-gray-600 text-gray-400 border border-gray-600 px-3 py-1.5 rounded font-medium transition">
-                        Raw Logs: OFF
-                    </button>
-                </div>
-            </div>
-
-            <div class="flex items-center space-x-2 pt-2 border-t border-gray-700">
-                <span class="text-gray-400 font-semibold whitespace-nowrap">Trigger / Tag:</span>
-                <input id="admin-trigger-input" type="text" placeholder="e.g. [PIN_ON(D7)] or [GET_WEATHER(Pendleton, OR)]" 
-                       onkeydown="if(event.key === 'Enter') submitAdminTrigger()"
-                       class="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-100 placeholder-gray-500 focus:outline-none focus:border-cyan-500">
-                <button onclick="submitAdminTrigger()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-1.5 rounded font-medium transition">
-                    Send Trigger
+            <!-- Shown ONLY when logged IN (Replaces Login button) -->
+            <div id="admin-controls" class="hidden flex items-center space-x-3">
+                <span id="user-email" class="text-xs text-gray-400 hidden sm:inline"></span>
+                <button id="admin-panel-btn" onclick="toggleAdminModal()" class="bg-amber-950 hover:bg-amber-900 text-amber-300 px-4 py-1.5 rounded border border-amber-700 text-sm font-bold transition">
+                    Admin Panel
+                </button>
+                <button onclick="supabaseSignOut()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded border border-gray-700 text-sm transition">
+                    Sign Out
                 </button>
             </div>
         </div>
-    </div>
+    </header>
 
-    <!-- Chat Container -->
-    <main id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-4 max-w-4xl w-full mx-auto">
-        <div class="flex items-start space-x-3">
-            <div class="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-xs font-bold text-white shadow">J</div>
-            <div class="bg-gray-800 border border-gray-700 rounded-2xl px-4 py-3 max-w-[85%] sm:max-w-[75%] text-sm shadow-sm">
-                <p class="leading-relaxed">System online. Click mic to enable wake-word listening ("Jarvis").</p>
-                <span class="text-[10px] text-gray-500 mt-1 block">Just now</span>
+    <!-- Chat Messages Container -->
+    <main id="chat-container" class="flex-1 overflow-y-auto p-6 space-y-4">
+        <div class="flex justify-start">
+            <div class="bg-gray-900 border border-cyan-800 rounded-lg p-4 max-w-xl text-sm text-gray-300 shadow-lg shadow-cyan-950/50">
+                <p class="text-cyan-400 font-bold mb-1">[SYSTEM]:</p>
+                <p id="system-welcome-msg">J.A.R.V.I.S. online. Please log in to unlock command transmission and admin controls.</p>
             </div>
         </div>
     </main>
 
-    <!-- Hidden audio element for speech streaming playback -->
-    <audio id="jarvis-audio" style="display:none;"></audio>
+    <!-- Audio Player for Voice Feedback -->
+    <audio id="audio-player" class="hidden"></audio>
 
-    <!-- Input Footer Bar -->
-    <footer class="bg-gray-800 border-t border-gray-700 p-4 shadow-lg">
-        <div class="max-w-4xl mx-auto flex items-center space-x-2">
-            <!-- Continuous Microphone Button Toggle -->
-            <button id="mic-button" onclick="toggleContinuousMic()" title="Toggle Wake Word Listening" 
-                    class="p-3 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
-                </svg>
+    <!-- Command Input Footer -->
+    <footer class="bg-gray-900 border-t border-cyan-800 p-4">
+        <form id="command-form" onsubmit="handleCommand(event)" class="flex gap-3 max-w-5xl mx-auto">
+            <input 
+                type="text" 
+                id="command-input" 
+                placeholder="Authenticate via Login button to transmit commands..." 
+                autocomplete="off"
+                disabled
+                class="flex-1 bg-gray-950 border border-cyan-800 rounded px-4 py-2.5 text-cyan-300 placeholder-gray-600 focus:outline-none focus:border-cyan-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+            <button 
+                type="submit" 
+                id="transmit-btn"
+                disabled
+                class="bg-cyan-900 hover:bg-cyan-800 text-cyan-200 px-6 py-2.5 rounded border border-cyan-700 text-sm font-bold transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                TRANSMIT
             </button>
-
-            <!-- Text Input -->
-            <input id="chat-input" type="text" placeholder="Say 'Jarvis [command]' or type here..." 
-                   onkeydown="if(event.key === 'Enter') submitMessage()"
-                   class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all">
-
-            <!-- Send Button -->
-            <button id="send-button" onclick="submitMessage()" 
-                    class="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-3 rounded-xl text-sm font-medium transition-all shadow hover:shadow-cyan-500/20 focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                Send
-            </button>
-        </div>
+        </form>
     </footer>
 
+    <!-- Login / Sign Up Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-gray-900 border border-cyan-800 rounded-lg p-6 w-full max-w-md shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-cyan-300">System Authentication</h2>
+                <button onclick="toggleAuthModal()" class="text-gray-500 hover:text-gray-300">✕</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">EMAIL</label>
+                    <input type="email" id="modal-email" class="w-full bg-gray-950 border border-cyan-800 rounded px-3 py-2 text-sm text-cyan-300 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">PASSWORD</label>
+                    <input type="password" id="modal-password" class="w-full bg-gray-950 border border-cyan-800 rounded px-3 py-2 text-sm text-cyan-300 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button onclick="supabaseSignIn()" class="flex-1 bg-cyan-900 hover:bg-cyan-800 text-cyan-200 py-2 rounded border border-cyan-700 text-sm font-bold transition">Login</button>
+                    <button onclick="supabaseSignUp()" class="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded border border-gray-700 text-sm transition">Register</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Panel Modal -->
+    <div id="admin-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-gray-900 border border-amber-700 rounded-lg p-6 w-full max-w-lg shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
+                <h2 class="text-lg font-bold text-amber-400">J.A.R.V.I.S. // ADMIN OVERRIDE</h2>
+                <button onclick="toggleAdminModal()" class="text-gray-500 hover:text-gray-300">✕</button>
+            </div>
+            <div class="space-y-4 text-sm text-gray-300">
+                <div class="flex items-center justify-between bg-gray-950 p-3 rounded border border-gray-800">
+                    <div>
+                        <p class="font-bold text-cyan-300">Show Raw AI Tags</p>
+                        <p class="text-xs text-gray-500">Display unstripped backend commands in chat</p>
+                    </div>
+                    <input type="checkbox" id="raw-toggle" class="w-4 h-4 accent-amber-500">
+                </div>
+                <div class="bg-gray-950 p-3 rounded border border-gray-800 space-y-2">
+                    <p class="font-bold text-cyan-300">Quick Hardware Overrides</p>
+                    <div class="flex gap-2">
+                        <button onclick="sendQuickCommand('Turn on ESP8266 onboard LED')" class="bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded text-xs border border-gray-700">D1 LED ON</button>
+                        <button onclick="sendQuickCommand('Turn off ESP8266 onboard LED')" class="bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded text-xs border border-gray-700">D1 LED OFF</button>
+                        <button onclick="sendQuickCommand('Go to sleep')" class="bg-red-950 hover:bg-red-900 text-red-300 px-3 py-1.5 rounded text-xs border border-red-800">Sleep Core</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Frontend Integration Script -->
     <script>
-        const BACKEND_URL = 'https://atticus-hp-z240-tower-workstation.tail932b25.ts.net';
+        // Replace with your Supabase Project URL and Anon Key
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        let recognition = null;
-        let isMicActive = false;
-        let silenceTimer = null;
-        let showRawLogs = false;
-        const PAUSE_THRESHOLD_MS = 1500;
+        const chatContainer = document.getElementById('chat-container');
+        const commandInput = document.getElementById('command-input');
+        const transmitBtn = document.getElementById('transmit-btn');
+        const audioPlayer = document.getElementById('audio-player');
 
-        document.addEventListener('DOMContentLoaded', () => {
-            document.body.classList.add('raw-logs-hidden');
+        // Check active session on load
+        supabaseClient.auth.getSession().then(({ data: { session } }) => {
+            updateAuthUI(session);
         });
 
-        function toggleAdminPanel() {
-            const panel = document.getElementById('admin-panel');
-            panel.classList.toggle('hidden');
+        supabaseClient.auth.onAuthStateChange((_event, session) => {
+            updateAuthUI(session);
+        });
+
+        function updateAuthUI(session) {
+            const loginBtn = document.getElementById('login-btn');
+            const adminControls = document.getElementById('admin-controls');
+            const userEmail = document.getElementById('user-email');
+            const welcomeMsg = document.getElementById('system-welcome-msg');
+
+            if (session) {
+                // Swap Login button for Admin Panel + Sign Out
+                loginBtn.classList.add('hidden');
+                adminControls.classList.remove('hidden');
+                userEmail.textContent = session.user.email;
+
+                // Enable command input
+                commandInput.disabled = false;
+                transmitBtn.disabled = false;
+                commandInput.placeholder = "Enter command for J.A.R.V.I.S....";
+                welcomeMsg.textContent = "Authentication verified. Systems online and awaiting your command, sir.";
+            } else {
+                // Swap Admin Panel back to Login button
+                loginBtn.classList.remove('hidden');
+                adminControls.classList.add('hidden');
+                userEmail.textContent = '';
+
+                // Lock command input
+                commandInput.disabled = true;
+                transmitBtn.disabled = true;
+                commandInput.placeholder = "Authenticate via Login button to transmit commands...";
+                welcomeMsg.textContent = "J.A.R.V.I.S. online. Please log in to unlock command transmission and admin controls.";
+            }
         }
 
-        function toggleRawLogs() {
-            showRawLogs = !showRawLogs;
-            const btn = document.getElementById('toggle-raw-btn');
-            
-            if (showRawLogs) {
-                document.body.classList.remove('raw-logs-hidden');
-                btn.textContent = 'Raw Logs: ON';
-                btn.classList.remove('bg-gray-700', 'text-gray-400', 'border-gray-600');
-                btn.classList.add('bg-cyan-900/60', 'text-cyan-200', 'border-cyan-500/40');
-            } else {
-                document.body.classList.add('raw-logs-hidden');
-                btn.textContent = 'Raw Logs: OFF';
-                btn.classList.remove('bg-cyan-900/60', 'text-cyan-200', 'border-cyan-500/40');
-                btn.classList.add('bg-gray-700', 'text-gray-400', 'border-gray-600');
-            }
+        function toggleAuthModal() {
+            document.getElementById('auth-modal').classList.toggle('hidden');
+        }
+
+        function toggleAdminModal() {
+            document.getElementById('admin-modal').classList.toggle('hidden');
+        }
+
+        async function supabaseSignIn() {
+            const email = document.getElementById('modal-email').value;
+            const password = document.getElementById('modal-password').value;
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) alert(error.message);
+            else toggleAuthModal();
+        }
+
+        async function supabaseSignUp() {
+            const email = document.getElementById('modal-email').value;
+            const password = document.getElementById('modal-password').value;
+            const { error } = await supabaseClient.auth.signUp({ email, password });
+            if (error) alert(error.message);
+            else alert('Registration successful. Check your email for confirmation.');
+        }
+
+        async function supabaseSignOut() {
+            await supabaseClient.auth.signOut();
+            document.getElementById('admin-modal').classList.add('hidden');
         }
 
         function sendQuickCommand(cmdText) {
-            const inputField = document.getElementById('chat-input');
-            inputField.value = cmdText;
-            submitMessage();
+            toggleAdminModal();
+            commandInput.value = cmdText;
+            handleCommand(new Event('submit'));
         }
 
-        async function submitMessage(customText = null) {
-            const inputField = document.getElementById('chat-input');
-            const message = customText !== null ? customText : inputField.value.trim();
-            if (!message) return;
+        async function handleCommand(event) {
+            event.preventDefault();
+            const cmd = commandInput.value.trim();
+            if (!cmd) return;
 
-            if (customText === null) {
-                inputField.value = '';
-            }
-            appendMessage(message, 'user');
+            appendMessage('USER', cmd, 'text-cyan-600');
+            commandInput.value = '';
 
             try {
-                const response = await fetch(`${BACKEND_URL}/ask`, {
+                const response = await fetch('http://localhost:5000/ask', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message })
+                    body: JSON.stringify({ command: cmd })
                 });
 
-                if (!response.ok) throw new Error('Network response was not ok');
-
                 const data = await response.json();
-                appendMessage(data.reply || 'Command executed.', 'jarvis', data.raw_reply || '');
+                const showRaw = document.getElementById('raw-toggle').checked;
+                const displayText = showRaw ? data.raw_reply : data.reply;
 
-                if (isMicActive) {
-                    playLatestAudio();
-                }
+                appendMessage('J.A.R.V.I.S.', displayText, 'text-cyan-400');
+                fetchAudioStream();
 
-            } catch (error) {
-                console.error('Error communicating with backend:', error);
-                appendMessage('Error: Failed to reach J.A.R.V.I.S. backend workstation.', 'system');
+            } catch (err) {
+                appendMessage('SYSTEM', 'Connection error to local backend core.', 'text-red-500');
             }
         }
 
-        async function playLatestAudio() {
+        async function fetchAudioStream() {
             try {
-                const audioRes = await fetch(`${BACKEND_URL}/get-audio`);
-                if (audioRes.ok) {
-                    const blob = await audioRes.blob();
-                    const audioUrl = URL.createObjectURL(blob);
-                    const audioElement = document.getElementById('jarvis-audio');
-                    audioElement.src = audioUrl;
-                    audioElement.play().catch(e => console.log("Audio autoplay prevented by browser:", e));
+                const res = await fetch('http://localhost:5000/get-audio');
+                if (res.ok) {
+                    const blob = await res.blob();
+                    audioPlayer.src = URL.createObjectURL(blob);
+                    audioPlayer.play();
                 }
             } catch (e) {
-                console.error("Failed to fetch audio stream:", e);
+                console.log('Audio fetch error:', e);
             }
         }
 
-        function submitAdminTrigger() {
-            const triggerInput = document.getElementById('admin-trigger-input');
-            const triggerText = triggerInput.value.trim();
-            if (!triggerText) return;
-            
-            triggerInput.value = '';
-            submitMessage(triggerText);
-        }
-
-        function appendMessage(text, sender, rawReply = '') {
-            const container = document.getElementById('chat-container');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `flex items-start space-x-3 ${sender === 'user' ? 'justify-end' : ''}`;
-
-            const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            if (sender === 'user') {
-                messageDiv.innerHTML = `
-                    <div class="bg-cyan-700 text-white rounded-2xl px-4 py-3 max-w-[85%] sm:max-w-[75%] text-sm shadow-sm">
-                        <p class="leading-relaxed">${escapeHtml(text)}</p>
-                        <span class="text-[10px] text-cyan-200 mt-1 block text-right">${timeString}</span>
-                    </div>
-                    <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-xs font-bold text-white shadow">U</div>
-                `;
-            } else {
-                let rawHtml = '';
-                if (rawReply) {
-                    rawHtml = `<div class="raw-log-line text-[11px] text-gray-400/60 font-mono mb-1.5 pb-1 border-b border-gray-700/50 select-all">RAW: ${escapeHtml(rawReply)}</div>`;
-                }
-
-                messageDiv.innerHTML = `
-                    <div class="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-xs font-bold text-white shadow">J</div>
-                    <div class="bg-gray-800 border border-gray-700 rounded-2xl px-4 py-3 max-w-[85%] sm:max-w-[75%] text-sm shadow-sm">
-                        ${rawHtml}
-                        <p class="leading-relaxed">${escapeHtml(text)}</p>
-                        <span class="text-[10px] text-gray-500 mt-1 block">${timeString}</span>
-                    </div>
-                `;
-            }
-
-            container.appendChild(messageDiv);
-            container.scrollTop = container.scrollHeight;
-        }
-
-        function escapeHtml(str) {
-            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-
-        function toggleContinuousMic() {
-            if (!isMicActive) {
-                startMicSession();
-            } else {
-                stopMicSession();
-            }
-        }
-
-        function startMicSession() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            
-            if (!SpeechRecognition) {
-                alert("Speech recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge.");
-                return;
-            }
-
-            recognition = new SpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.lang = 'en-US';
-
-            recognition.onstart = () => {
-                isMicActive = true;
-                const micButton = document.getElementById('mic-button');
-                const indicator = document.getElementById('status-indicator');
-                
-                micButton.classList.add('bg-red-600', 'text-white', 'shadow-[0_0_12px_#dc2626]');
-                micButton.classList.remove('bg-gray-700', 'text-gray-300');
-                
-                indicator.classList.remove('bg-gray-500', 'shadow-[0_0_8px_#6b7280]');
-                indicator.classList.add('bg-cyan-400', 'animate-pulse', 'shadow-[0_0_8px_#22d3ee]');
-            };
-
-            recognition.onresult = (event) => {
-                let spokenText = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    spokenText += event.results[i][0].transcript;
-                }
-                spokenText = spokenText.trim();
-
-                const lowerText = spokenText.toLowerCase();
-                
-                // Only act if "jarvis" is detected in the speech stream
-                if (lowerText.includes("jarvis")) {
-                    const parts = lowerText.split("jarvis");
-                    const commandPart = parts[parts.length - 1].trim();
-
-                    const inputField = document.getElementById('chat-input');
-                    if (inputField) {
-                        inputField.value = commandPart;
-                    }
-
-                    clearTimeout(silenceTimer);
-                    if (commandPart.length > 0) {
-                        silenceTimer = setTimeout(() => {
-                            triggerAutoSend(commandPart);
-                        }, PAUSE_THRESHOLD_MS);
-                    }
-                }
-            };
-
-            recognition.onerror = (event) => {
-                console.error("Speech recognition error:", event.error);
-                if (event.error === 'not-allowed') {
-                    alert("Microphone permission denied. Please allow mic access in your browser settings.");
-                    stopMicSession();
-                }
-            };
-
-            recognition.onend = () => {
-                if (isMicActive) {
-                    try {
-                        recognition.start();
-                    } catch (e) {
-                        console.error("Restart failed:", e);
-                    }
-                }
-            };
-
-            try {
-                recognition.start();
-            } catch (err) {
-                console.error("Could not start recognition:", err);
-            }
-        }
-
-        function stopMicSession() {
-            isMicActive = false;
-            clearTimeout(silenceTimer);
-            if (recognition) {
-                recognition.stop();
-                recognition = null;
-            }
-            const micButton = document.getElementById('mic-button');
-            const indicator = document.getElementById('status-indicator');
-            
-            micButton.classList.remove('bg-red-600', 'text-white', 'shadow-[0_0_12px_#dc2626]');
-            micButton.classList.add('bg-gray-700', 'text-gray-300');
-            
-            indicator.classList.remove('bg-cyan-400', 'animate-pulse', 'shadow-[0_0_8px_#22d3ee]');
-            indicator.classList.add('bg-gray-500', 'shadow-[0_0_8px_#6b7280]');
-        }
-
-        function triggerAutoSend(messageText) {
-            clearTimeout(silenceTimer);
-            const inputField = document.getElementById('chat-input');
-            if (inputField) inputField.value = messageText;
-            submitMessage();
+        function appendMessage(sender, text, colorClass) {
+            const div = document.createElement('div');
+            div.className = 'flex justify-start';
+            div.innerHTML = `
+                <div class="bg-gray-900 border border-cyan-800 rounded-lg p-4 max-w-xl text-sm text-gray-300 shadow-lg shadow-cyan-950/50">
+                    <p class="${colorClass} font-bold mb-1">[${sender}]:</p>
+                    <p>${text}</p>
+                </div>
+            `;
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
         }
     </script>
 </body>
